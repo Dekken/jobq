@@ -16,6 +16,8 @@ How to use:
 
 License : BSD
 
+Caveats:
+    Piping or && or || are not supported. See ./res/test for how to connect commands
 
 Job file format
 
