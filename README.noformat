@@ -1,0 +1,68 @@
+jobq
+===
+
+C++ lockless job runner
+
+How to use:
+    JOBQ_HOME=$PWD jobq &
+    echo $! > pid
+    cp res/test j/p/.test
+    mv j/p/.test j/p/test
+    sleep 10
+    ls j/f
+    kill -9 $(cat pid)
+    rm pid
+
+
+License : BSD
+
+
+Job file format
+
+                                                    OPTIONAL
+pre - sanity checks, non 0 exit code = fail         YES
+env - environment variables for run command         YES
+log - tail log for duration of cmd                  YES
+cmd - operation command                             NO
+
+[
+    {
+        "pre" : [ "" ],
+        "env" : [
+           {
+              "ENV" : "VAR"
+           }
+        ],
+        "log" : "/home/philix/.bash_history",
+        "cmd" : "ls"
+    },
+    {
+        "pre" : [ "" ],
+        "env" : [
+           {
+              "ENV" : "VAR"
+           }
+        ],
+        "log" : "/home/philix/.bash_history",
+        "cmd" : "ls"
+    }
+]
+
+Directory structure:
+    $JOBQ_HOME/j/p : pending - new jobs
+    $JOBQ_HOME/j/e : error   - failed jobs
+    $JOBQ_HOME/j/r : running - currently operating jobs
+    $JOBQ_HOME/j/f : pending - finished jobs
+
+
+New job file "test", when run without errors. becomes 
+    $JOBQ_HOME/j/f/test.tar.gz
+Containing all out/err/log for each command
+    test
+     -> 1
+        -> out  # output from command 1
+     -> 2
+        -> out  # output from command 2
+     -> test    # copy of original json
+
+Error files have the exception output appended to the command in the json file.

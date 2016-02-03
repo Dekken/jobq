@@ -1,0 +1,14 @@
+
+
+name: jobq
+version: master
+
+inc: ./inc
+
+dep:
+  - name: mkn.kul
+    version: master
+  - name: parse.json
+    version: master
+
+main: cpp.cpp
