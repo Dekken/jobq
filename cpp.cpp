@@ -37,7 +37,7 @@ int main(int argc, char* argv[]){
 	try{
 		jobq::App().start();
 	}
-	catch(const kul::Exception& e){ KOUT(NON) << e.debug(); return 2;}
+	catch(const kul::Exception& e){ KOUT(NON) << e.stack(); return 2;}
 	catch(const std::exception& e){ KOUT(NON) << e.what() << " " << typeid(e).name(); return 3;}
 
 	return 0;
