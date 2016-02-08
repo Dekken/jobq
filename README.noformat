@@ -25,6 +25,7 @@ Job file format
 pre - sanity checks, non 0 exit code = fail         YES
 env - environment variables for run command         YES
 log - tail log for duration of cmd                  YES
+dir - directory to run in                           YES Default: $JOBQ_HOME/j/p/<JOB>
 cmd - operation command                             NO
 
 [
@@ -35,7 +36,8 @@ cmd - operation command                             NO
               "ENV" : "VAR"
            }
         ],
-        "log" : "/home/philix/.bash_history",
+        "log" : "~/.bash_history",
+        "dir" : "~/"
         "cmd" : "ls"
     },
     {
@@ -45,7 +47,7 @@ cmd - operation command                             NO
               "ENV" : "VAR"
            }
         ],
-        "log" : "/home/philix/.bash_history",
+        "log" : "~/.bash_history",
         "cmd" : "ls"
     }
 ]

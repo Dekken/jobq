@@ -137,9 +137,8 @@ class Job{
 				if(cmd.isMember("pre"))
 					for(const auto& arr : cmd["pre"]){
 						const auto& bits = kul::cli::asArgs(arr.asString());
-						kul::Process p(bits[0], jobD.real());		
+						kul::Process p(bits[0], cmd.isMember("dir") ? cmd["dir"].asString() : jobD.real());
 						for(size_t i = 1; i < bits.size(); i++) p.arg(bits[i]);
-						kul::ProcessCapture pc(p);
 						try{
 							p.start();
 						}catch(const kul::proc::ExitException& e){ 
