@@ -114,71 +114,78 @@ class Job{
 			if(s.size()) kul::io::Writer(f.full().c_str()) << s; 
 		}
 	public:
-		void error(const kul::File& f, Json::Value& r, const std::string& s){
-			KLOG(DBG) << s;
+		void fail(const kul::File& f, Json::Value& r, const std::string& s) throw(Exception){
+			r["error"] = Json::arrayValue;
+			for(const auto& b : kul::String::lines(s)) r["error"].append(b);
+			KEXCEPTION(s);
+		}
+		void error(const kul::File& f, Json::Value& r, const std::string& s) throw(Exception){
 			r["error"] = Json::arrayValue;
 			for(const auto& b : kul::String::split(s, '\n')) r["error"].append(b);
 			kul::io::Writer(Dirs::INSTANCE().error().join(f.name()).c_str()) << Json::StyledWriter().write(r);
 			f.rm();
 			KEXCEPTION(s);
 		}
-		void handle(const kul::File& f){
+		void handle(const kul::File& f) throw(Exception){
 			std::ifstream config_doc(f.real(), std::ifstream::binary);
 			Json::Value json;
 			Json::CharReaderBuilder rbuilder;
 			std::string errs;
 			if (!Json::parseFromStream(rbuilder, config_doc, &json, &errs))	
 				error(f, json, "JSON failed to parse jobfile:" + f.real() + "\n"+errs);
+			
 			kul::Dir j(Dirs::INSTANCE().running().join(f.name()));
-			uint32_t k = 1;
-			for(auto& cmd : json){
-				kul::Dir jobD(j.join(std::to_string(k)));
-				if(!jobD.is() && !jobD.mk()) error(f, json, "Could not make job dir :" + jobD.path());
-				if(cmd.isMember("pre"))
-					for(const auto& arr : cmd["pre"]){
-						const auto& bits = kul::cli::asArgs(arr.asString());
-						kul::Process p(bits[0], cmd.isMember("dir") ? cmd["dir"].asString() : jobD.real());
-						for(size_t i = 1; i < bits.size(); i++) p.arg(bits[i]);
+			try{
+				uint32_t k = 1;
+				for(auto& cmd : json){
+					kul::Dir jobD(j.join(std::to_string(k)));
+					if(!jobD.is() && !jobD.mk()) error(f, cmd, "Could not make job dir :" + jobD.path());
+					if(cmd.isMember("pre"))
+						for(const auto& arr : cmd["pre"]){
+							const auto& bits = kul::cli::asArgs(arr.asString());
+							kul::Process p(bits[0], jobD.real());
+							for(size_t i = 1; i < bits.size(); i++) p.arg(bits[i]);
+							try{
+								p.start();
+							}catch(const kul::proc::ExitException& e){ 
+								fail(f, cmd, "pre command had non zero exit code: " + std::to_string(e.code()) + "\n" + std::string(e.what()));
+							}catch(const kul::Exception& e){ 
+								fail(f, cmd, "pre command threw exception\n" + std::string(e.what()));
+							}
+						}
+					const auto& bits = kul::cli::asArgs(cmd["cmd"].asString());
+					kul::Process p(bits[0], cmd.isMember("dir") ? cmd["dir"].asString() : jobD.real());
+					for(size_t i = 1; i < bits.size(); i++) p.arg(bits[i]);
+					std::unique_ptr<FileDiffCopier> differ;
+					if(cmd.isMember("log")){
+						if(!kul::File(cmd["log"].asString()).is())
+							fail(f, cmd, "File does not exist: "+ cmd["log"].asString());	
+						else differ = std::make_unique<FileDiffCopier>(cmd["log"].asString(), kul::File("log", jobD).full());
+					}
+					if(cmd.isMember("env"))
+						for(const auto& arr : cmd["env"])
+							for(const auto& env : arr.getMemberNames())
+								p.var(env, arr[env].asString());
+					{
+						JobCapture pc(p, jobD);
 						try{
 							p.start();
-						}catch(const kul::proc::ExitException& e){ 
-							error(f, cmd, "pre command had non zero exit code: " + std::to_string(e.code()) + "\n" + std::string(e.what()));
 						}catch(const kul::Exception& e){ 
-							error(f, cmd, "pre command threw exception\n" + std::string(e.what()));
+							if(differ.get()) differ->finish();
+							fail(f, cmd, "run threw exception\n" + std::string(e.what()));
 						}
-					}
-				const auto& bits = kul::cli::asArgs(cmd["cmd"].asString());
-				kul::Process p(bits[0], jobD.real());
-				for(size_t i = 1; i < bits.size(); i++) p.arg(bits[i]);
-				std::unique_ptr<FileDiffCopier> differ;
-				if(cmd.isMember("log")){
-					if(!kul::File(cmd["log"].asString()).is())
-						error(f, json, "File does not exist: "+ cmd["log"].asString());	
-					else differ = std::make_unique<FileDiffCopier>(cmd["log"].asString(), kul::File("log", jobD).full());
-				}
-				if(cmd.isMember("env"))
-					for(const auto& arr : cmd["env"])
-						for(const auto& env : arr.getMemberNames())
-							p.var(env, arr[env].asString());
-				{
-					JobCapture pc(p, jobD);
-					try{
-						p.start();
-					}catch(const kul::Exception& e){ 
 						if(differ.get()) differ->finish();
-						error(f, json, "run threw exception\n" + std::string(e.what()));
 					}
-					if(differ.get()) differ->finish();
+					kul::File out("out", jobD);
+					kul::File err("err", jobD);
+					if(out.size() == 0) out.rm();
+					if(err.size() == 0) err.rm();
+					k++;
 				}
-				kul::File out("out", jobD);
-				kul::File err("err", jobD);
-				if(out.size() == 0) out.rm();
-				if(err.size() == 0) err.rm();
-				k++;
-			}
+			}catch(const jobq::Exception& e){}
 			kul::io::Writer(kul::File(f.name(), j)) << Json::StyledWriter().write(json);
 			kul::File tar(kul::Dir::JOIN(Dirs::INSTANCE().finished().real(), "."+j.name()+".tar.gz"));
-			kul::Process("tar", j.parent().path()).arg("cf").arg(tar.full()).arg(j.name()).start();
+			kul::Process("tar", j.parent().path()).arg("cf").arg("\""+tar.full()+"\"").arg("\""+j.name()+"\"").start();
 			tar.mv(kul::File(tar.name().substr(1), tar.dir()));
 			f.rm();
 			j.rm();
@@ -219,7 +226,7 @@ class App : public Constants{
 						kul::ScopeLock lock(mutex);
 						try{
 							Job().handle(f);
-						}catch(const kul::Exception& e){ KOUT(NON) << e.debug(); }
+						}catch(const kul::Exception& e){ KERR << e.stack(); }
 					}
 					kul::this_thread::sleep(111);
 				}
