@@ -3,12 +3,20 @@
 name: jobq
 version: master
 
-inc: ./inc
 
-dep:
-  - name: mkn.kul
-    version: master
-  - name: parse.json
-    version: master
-
+parent: c
 main: cpp.cpp
+
+profile:
+  - name: c
+    inc: ./inc
+    dep:
+      - name: mkn.kul
+        version: master
+      - name: parse.json
+        version: master
+
+  - name: test
+    parent: c
+    inc: ./inc
+    main: test.cpp

@@ -99,11 +99,10 @@ class FileDiffCopier{
 
 class JobCapture : public kul::ProcessCapture{
 	private:
-		const kul::Dir& d;
 		const kul::File e, o;
 		kul::io::Writer we, wo;
 	public:
-		JobCapture(kul::AProcess& p, const kul::Dir& d) : kul::ProcessCapture(p), d(d), e("err", d), o("out", d), we(e), wo(o){}
+		JobCapture(kul::AProcess& p, const kul::Dir& d) : kul::ProcessCapture(p), e("err", d), o("out", d), we(e), wo(o){}
         virtual void out(const std::string& s){ wo << s; }
         virtual void err(const std::string& s){ we << s; }
 };
@@ -147,7 +146,7 @@ class Job{
 							for(size_t i = 1; i < bits.size(); i++) p.arg(bits[i]);
 							try{
 								p.start();
-							}catch(const kul::proc::ExitException& e){ 
+							}catch(const kul::proc::ExitException& e){  // DEFINE FAIL/NOFAIL
 								fail(f, cmd, "pre command had non zero exit code: " + std::to_string(e.code()) + "\n" + std::string(e.what()));
 							}catch(const kul::Exception& e){ 
 								fail(f, cmd, "pre command threw exception\n" + std::string(e.what()));
@@ -158,7 +157,7 @@ class Job{
 					for(size_t i = 1; i < bits.size(); i++) p.arg(bits[i]);
 					std::unique_ptr<FileDiffCopier> differ;
 					if(cmd.isMember("log")){
-						if(!kul::File(cmd["log"].asString()).is())
+						if(!kul::File(cmd["log"].asString()).is()) // DEFINE FAIL/NOFAIL
 							fail(f, cmd, "File does not exist: "+ cmd["log"].asString());	
 						else differ = std::make_unique<FileDiffCopier>(cmd["log"].asString(), kul::File("log", jobD).full());
 					}
@@ -219,13 +218,14 @@ class App : public Constants{
 			hTh.rethrow();
 		}
 		void operator()(){
+			Job j;
 			while(/*active*/1){	
 				for(auto& f : Dirs::INSTANCE().pending().files()){
 					if(f.name()[0] == '.') continue;
 					{
 						kul::ScopeLock lock(mutex);
 						try{
-							Job().handle(f);
+							j.handle(f);
 						}catch(const kul::Exception& e){ KERR << e.stack(); }
 					}
 					kul::this_thread::sleep(111);
