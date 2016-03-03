@@ -70,3 +70,11 @@ Containing all out/err/log for each command
      -> test    # copy of original json
 
 Error files have the exception output appended to the command in the json file.
+
+
+Switches
+ 
+Key             _JOBQ_BREAK_ON_ERROR_ 
+Type            bool
+Default         1
+Description     if true job stops and no further commands are executed

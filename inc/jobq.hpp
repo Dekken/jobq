@@ -43,6 +43,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <json/reader.h>
 #include <json/writer.h>
 
+#ifndef   _JOBQ_BREAK_ON_ERROR_
+#define   _JOBQ_BREAK_ON_ERROR_ 1
+#endif /* _JOBQ_BREAK_ON_ERROR_ */
+
 namespace jobq{
 class Exception : public kul::Exception{
 	public:
@@ -115,12 +119,12 @@ class Job{
 	public:
 		void fail(const kul::File& f, Json::Value& r, const std::string& s) throw(Exception){
 			r["error"] = Json::arrayValue;
-			for(const auto& b : kul::String::lines(s)) r["error"].append(b);
+			for(const auto& b : kul::String::LINES(s)) r["error"].append(b);
 			KEXCEPTION(s);
 		}
 		void error(const kul::File& f, Json::Value& r, const std::string& s) throw(Exception){
 			r["error"] = Json::arrayValue;
-			for(const auto& b : kul::String::split(s, '\n')) r["error"].append(b);
+			for(const auto& b : kul::String::SPLIT(s, '\n')) r["error"].append(b);
 			kul::io::Writer(Dirs::INSTANCE().error().join(f.name()).c_str()) << Json::StyledWriter().write(r);
 			f.rm();
 			KEXCEPTION(s);
@@ -170,8 +174,13 @@ class Job{
 						try{
 							p.start();
 						}catch(const kul::Exception& e){ 
-							if(differ.get()) differ->finish();
-							fail(f, cmd, "run threw exception\n" + std::string(e.what()));
+							if(_JOBQ_BREAK_ON_ERROR_){
+								if(differ.get()) differ->finish();
+								fail(f, cmd, "run threw exception\n" + std::string(e.what()));
+							}else{
+								cmd["error"] = Json::arrayValue;
+								for(const auto& b : kul::String::LINES(std::string(e.what()))) cmd["error"].append(b);
+							}
 						}
 						if(differ.get()) differ->finish();
 					}
@@ -195,14 +204,13 @@ class App : public Constants{
 	private:
 		bool s = 0;
 		kul::Mutex mutex;
-		kul::Ref<App> ref;
 		kul::Thread hTh;
 
 		kul::Signal sig;
 		const std::function<void(int)> f;
 	protected:
 	public:
-		App() : ref(*this), hTh(ref), f(std::bind(&App::shutdown, std::ref(*this), std::placeholders::_1)){
+		App() : hTh(std::ref(*this)), f(std::bind(&App::shutdown, std::ref(*this), std::placeholders::_1)){
 			sig.abrt(f).intr(f).segv(f);
 		}
 
