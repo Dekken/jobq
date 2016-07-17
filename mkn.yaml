@@ -10,9 +10,9 @@ profile:
     inc: ./inc
     dep:
       - name: mkn.kul
-        version: 21062016
+        version: master
       - name: parse.json
-        version: 21062016
+        version: master
 
   - name: test
     parent: c
