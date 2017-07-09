@@ -1,9 +1,10 @@
-
+#! clean build -dtKa -O2 -l -pthread
 
 name: jobq
 
 parent: c
 main: cpp.cpp
+mode: none
 
 profile:
   - name: c

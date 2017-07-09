@@ -31,11 +31,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "jobq.hpp"
 
 int main(int argc, char* argv[]){
-	try{
-		jobq::App().start();
-	}
-	catch(const kul::Exception& e){ KOUT(NON) << e.stack(); return 2;}
-	catch(const std::exception& e){ KOUT(NON) << e.what() << " " << typeid(e).name(); return 3;}
+    try{
+        jobq::App().start();
+    }
+    catch(const kul::Exception& e){ KOUT(NON) << e.stack(); return 2;}
+    catch(const std::exception& e){ KOUT(NON) << e.what() << " " << typeid(e).name(); return 3;}
 
-	return 0;
+    return 0;
 }
